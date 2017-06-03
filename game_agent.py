@@ -35,7 +35,15 @@ def custom_score(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+    return float(own_moves - opp_moves)
 
 
 def custom_score_2(game, player):
@@ -61,7 +69,15 @@ def custom_score_2(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+    return float(own_moves - opp_moves)
 
 
 def custom_score_3(game, player):
@@ -87,7 +103,15 @@ def custom_score_3(game, player):
         The heuristic value of the current game state to the specified player.
     """
     # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+    return float(own_moves - opp_moves)
 
 
 class IsolationPlayer:
@@ -162,10 +186,12 @@ class MinimaxPlayer(IsolationPlayer):
         try:
             # The try/except block will automatically catch the exception
             # raised when the timer is about to expire.
-            return self.minimax(game, self.search_depth)
+            value, best_move = self.minimax(game, self.search_depth)
+            return best_move
 
         except SearchTimeout:
-            pass  # Handle any actions required after timeout as needed
+            # Handle any actions required after timeout as needed
+            raise TimeoutError("{} failed at {} position".format(type(self).__name__, game.get_player_location(self)))
 
         # Return the best move from the last completed search iteration
         return best_move
@@ -213,7 +239,32 @@ class MinimaxPlayer(IsolationPlayer):
             raise SearchTimeout()
 
         # TODO: finish this function!
-        raise NotImplementedError
+        # 1) Return the value of the state if it is terminal or depth limit was reached
+        move = game.NOT_MOVED
+        if game.is_loser(self) or game.is_winner(self) or depth==0:
+            return self.score(game, self), move
+        # 2) Pick best of all legal moves available
+        if self==game.active_player:
+            # on your turn
+            value = float("-inf")
+            for m in game.get_legal_moves(self):
+                new_game = game.forecast_move(m)
+                v_, m_ = self.minimax(new_game, depth-1)
+                value, move = (value, move) if value == v_ else max((value, move), (v_, m))
+            if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
+                move = game.get_legal_moves(self)[0]
+            return value, move
+        else:
+            # on competitor turn
+            opponent = game.get_opponent(self)
+            value = float("inf")
+            for m in game.get_legal_moves(opponent):
+                new_game = game.forecast_move(m)
+                v_, m_ = self.minimax(new_game, depth-1)
+                value, move = (value, move) if value == v_ else min((value, move), (v_, m))
+            if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
+                move = game.get_legal_moves(opponent)[0]
+            return value, move
 
 
 class AlphaBetaPlayer(IsolationPlayer):
@@ -255,7 +306,20 @@ class AlphaBetaPlayer(IsolationPlayer):
         self.time_left = time_left
 
         # TODO: finish this function!
-        raise NotImplementedError
+        best_move = (-1, -1)
+
+        try:
+            # The try/except block will automatically catch the exception
+            # raised when the timer is about to expire.
+            value, best_move = self.alphabeta(game, self.search_depth)
+            return best_move
+
+        except SearchTimeout:
+            # Handle any actions required after timeout as needed
+            raise TimeoutError("{} failed at {} position".format(type(self).__name__, game.get_player_location(self)))
+
+        # Return the best move from the last completed search iteration
+        return best_move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf")):
         """Implement depth-limited minimax search with alpha-beta pruning as
@@ -306,4 +370,35 @@ class AlphaBetaPlayer(IsolationPlayer):
             raise SearchTimeout()
 
         # TODO: finish this function!
-        raise NotImplementedError
+        # 1) Return the value of the state if it is terminal or depth limit was reached
+        move = game.NOT_MOVED
+        if game.is_loser(self) or game.is_winner(self) or depth == 0:
+            return self.score(game, self), move
+        # 2) Pick best of all legal moves available
+        if self == game.active_player:
+            # on your turn
+            value = alpha
+            for m in game.get_legal_moves(self):
+                new_game = game.forecast_move(m)
+                v_, m_ = self.alphabeta(new_game, depth - 1, alpha, beta)
+                value, move = (value, move) if value==v_ else max((value, move), (v_, m))
+                if value>=beta:
+                    return value, move
+                alpha = value
+            if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
+                move = game.get_legal_moves(self)[0]
+            return value, move
+        else:
+            # on competitor turn
+            opponent = game.get_opponent(self)
+            value = beta
+            for m in game.get_legal_moves(opponent):
+                new_game = game.forecast_move(m)
+                v_, m_ = self.alphabeta(new_game, depth - 1, alpha, beta)
+                value, move = (value, move) if value == v_ else min((value, move), (v_, m))
+                if value <= alpha:
+                    return value, move
+                beta = value
+            if move == game.NOT_MOVED and len(game.get_legal_moves(self)) > 0:
+                move = game.get_legal_moves(opponent)[0]
+            return value, move
