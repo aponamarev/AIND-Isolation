@@ -181,7 +181,7 @@ class MinimaxPlayer(IsolationPlayer):
 
         # Initialize the best move so that this function returns something
         # in case the search fails due to timeout
-        best_move = (-1, -1)
+        best_move = game.get_legal_moves(self)[0]
 
         try:
             # The try/except block will automatically catch the exception
@@ -191,7 +191,7 @@ class MinimaxPlayer(IsolationPlayer):
 
         except SearchTimeout:
             # Handle any actions required after timeout as needed
-            raise TimeoutError("{} failed at {} position".format(type(self).__name__, game.get_player_location(self)))
+            return best_move
 
         # Return the best move from the last completed search iteration
         return best_move
@@ -241,8 +241,10 @@ class MinimaxPlayer(IsolationPlayer):
         # TODO: finish this function!
         # 1) Return the value of the state if it is terminal or depth limit was reached
         move = game.NOT_MOVED
-        if game.is_loser(self) or game.is_winner(self) or depth==0:
-            return self.score(game, self), move
+        if game.is_loser(self) or game.is_winner(self):
+            return game.utility(self)
+        elif depth == 0:
+            return self.score(game, self)
         # 2) Pick best of all legal moves available
         if self==game.active_player:
             # on your turn
@@ -265,6 +267,34 @@ class MinimaxPlayer(IsolationPlayer):
             if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
                 move = game.get_legal_moves(opponent)[0]
             return value, move
+
+    def min_value(self, game, depth):
+        # 1) Return the value of the state if it is terminal or depth limit was reached
+        if game.is_loser(self) or game.is_winner(self):
+            return game.utility(self)
+        elif depth==0:
+            return self.score(game, self)
+        # 2) Pick best of all legal moves available
+        value = float("-inf")
+        for m in game.get_legal_moves(self):
+            new_game = game.forecast_move(m)
+            value = min(value, self.max_value(new_game, depth-1))
+        return value
+
+    def max_value(self, game, depth):
+        # 1) Return the value of the state if it is terminal or depth limit was reached
+        if game.is_loser(self) or game.is_winner(self):
+            return game.utility(self)
+        elif depth==0:
+            return self.score(game, self)
+        # 2) Pick best of all legal moves available
+        value = float("-inf")
+        for m in game.get_legal_moves(self):
+            new_game = game.forecast_move(m)
+            value = max(value, self.min_value(new_game, depth-1))
+        return value
+
+        
 
 
 class AlphaBetaPlayer(IsolationPlayer):
@@ -306,7 +336,7 @@ class AlphaBetaPlayer(IsolationPlayer):
         self.time_left = time_left
 
         # TODO: finish this function!
-        best_move = (-1, -1)
+        best_move = game.get_legal_moves(self)[0]
         depth = self.search_depth
 
         try:
