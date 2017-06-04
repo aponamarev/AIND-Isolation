@@ -41,9 +41,7 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
+    return 0.
 
 
 def custom_score_2(game, player):
@@ -75,9 +73,7 @@ def custom_score_2(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
+    return float(len(game.get_legal_moves(player)))
 
 
 def custom_score_3(game, player):
@@ -109,9 +105,9 @@ def custom_score_3(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
+    w, h = game.width / 2., game.height / 2.
+    y, x = game.get_player_location(player)
+    return float((h - y)**2 + (w - x)**2)
 
 
 class IsolationPlayer:
@@ -181,13 +177,12 @@ class MinimaxPlayer(IsolationPlayer):
 
         # Initialize the best move so that this function returns something
         # in case the search fails due to timeout
-        best_move = game.get_legal_moves(self)[0]
+        best_move = (-1, -1)
 
         try:
             # The try/except block will automatically catch the exception
             # raised when the timer is about to expire.
-            value, best_move = self.minimax(game, self.search_depth)
-            return best_move
+            best_move = self.minimax(game, self.search_depth)
 
         except SearchTimeout:
             # Handle any actions required after timeout as needed
@@ -235,66 +230,48 @@ class MinimaxPlayer(IsolationPlayer):
                 each helper function or else your agent will timeout during
                 testing.
         """
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise SearchTimeout()
 
         # TODO: finish this function!
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
         # 1) Return the value of the state if it is terminal or depth limit was reached
-        move = game.NOT_MOVED
-        if game.is_loser(self) or game.is_winner(self):
-            return game.utility(self)
-        elif depth == 0:
-            return self.score(game, self)
+        value = float("-inf")
+        move = (-1, -1)
+        moves = game.get_legal_moves(self)
+        if not moves:
+            return move
+        elif len(moves)==1:
+            return moves[0]
         # 2) Pick best of all legal moves available
-        if self==game.active_player:
-            # on your turn
-            value = float("-inf")
-            for m in game.get_legal_moves(self):
-                new_game = game.forecast_move(m)
-                v_, m_ = self.minimax(new_game, depth-1)
-                value, move = (value, move) if value == v_ else max((value, move), (v_, m))
-            if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
-                move = game.get_legal_moves(self)[0]
-            return value, move
-        else:
-            # on competitor turn
-            opponent = game.get_opponent(self)
-            value = float("inf")
-            for m in game.get_legal_moves(opponent):
-                new_game = game.forecast_move(m)
-                v_, m_ = self.minimax(new_game, depth-1)
-                value, move = (value, move) if value == v_ else min((value, move), (v_, m))
-            if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
-                move = game.get_legal_moves(opponent)[0]
-            return value, move
+        values = list(map(lambda m: self.min_value(game.forecast_move(m), depth - 1), moves))
+        return moves[values.index(max(values))]
 
     def min_value(self, game, depth):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
         # 1) Return the value of the state if it is terminal or depth limit was reached
-        if game.is_loser(self) or game.is_winner(self):
-            return game.utility(self)
-        elif depth==0:
+        opponent = game.get_opponent(self)
+        moves = game.get_legal_moves(opponent)
+        if depth == 0 or not moves:
             return self.score(game, self)
         # 2) Pick best of all legal moves available
-        value = float("-inf")
-        for m in game.get_legal_moves(self):
-            new_game = game.forecast_move(m)
-            value = min(value, self.max_value(new_game, depth-1))
+        value = float("inf")
+        for m in moves:
+            value = min(value, self.max_value(game.forecast_move(m), depth - 1))
         return value
 
     def max_value(self, game, depth):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
         # 1) Return the value of the state if it is terminal or depth limit was reached
-        if game.is_loser(self) or game.is_winner(self):
-            return game.utility(self)
-        elif depth==0:
+        moves = game.get_legal_moves(self)
+        if depth == 0 or not moves:
             return self.score(game, self)
         # 2) Pick best of all legal moves available
         value = float("-inf")
-        for m in game.get_legal_moves(self):
-            new_game = game.forecast_move(m)
-            value = max(value, self.min_value(new_game, depth-1))
+        for m in moves:
+            value = max(value, self.min_value(game.forecast_move(m), depth - 1))
         return value
-
-        
 
 
 class AlphaBetaPlayer(IsolationPlayer):
@@ -336,15 +313,18 @@ class AlphaBetaPlayer(IsolationPlayer):
         self.time_left = time_left
 
         # TODO: finish this function!
-        best_move = game.get_legal_moves(self)[0]
-        depth = self.search_depth
+        best_move = (-1, -1)
+        depth = 0
+        moves = game.get_legal_moves()
+        if not moves:
+            return best_move
 
         try:
             # The try/except block will automatically catch the exception
             # raised when the timer is about to expire.
             while True:
-                value, best_move = self.alphabeta(game, depth)
                 depth += 1
+                best_move = self.alphabeta(game, depth)
 
         except SearchTimeout:
             # Handle any actions required after timeout as needed
@@ -398,39 +378,48 @@ class AlphaBetaPlayer(IsolationPlayer):
                 each helper function or else your agent will timeout during
                 testing.
         """
-        if self.time_left() < self.TIMER_THRESHOLD:
-            raise SearchTimeout()
 
         # TODO: finish this function!
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
         # 1) Return the value of the state if it is terminal or depth limit was reached
-        move = game.NOT_MOVED
-        if game.is_loser(self) or game.is_winner(self) or depth == 0:
-            return self.score(game, self), move
+        moves = game.get_legal_moves()
+        if not moves:
+            return (-1, -1)
+        elif len(moves)==1:
+            return moves[0]
         # 2) Pick best of all legal moves available
-        if self == game.active_player:
-            # on your turn
-            value = alpha
-            for m in game.get_legal_moves(self):
-                new_game = game.forecast_move(m)
-                v_, m_ = self.alphabeta(new_game, depth - 1, alpha, beta)
-                value, move = (value, move) if value==v_ else max((value, move), (v_, m))
-                if value>=beta:
-                    return value, move
-                alpha = value
-            if move==game.NOT_MOVED and len(game.get_legal_moves(self))>0:
-                move = game.get_legal_moves(self)[0]
-            return value, move
-        else:
-            # on competitor turn
-            opponent = game.get_opponent(self)
-            value = beta
-            for m in game.get_legal_moves(opponent):
-                new_game = game.forecast_move(m)
-                v_, m_ = self.alphabeta(new_game, depth - 1, alpha, beta)
-                value, move = (value, move) if value == v_ else min((value, move), (v_, m))
-                if value <= alpha:
-                    return value, move
-                beta = value
-            if move == game.NOT_MOVED and len(game.get_legal_moves(self)) > 0:
-                move = game.get_legal_moves(opponent)[0]
-            return value, move
+        values = list(map(lambda m: self.min_value(game.forecast_move(m), depth - 1, alpha, beta), moves))
+        return moves[values.index(max(values))]
+
+    def max_value(self, game, depth, alpha=float("-inf"), beta=float("inf")):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+        # 1) Return the value of the state if it is terminal or depth limit was reached
+        moves = game.get_legal_moves(self)
+        if depth == 0 or not moves:
+            return self.score(game, self)
+        # 2) Pick best of all legal moves available
+        value = float("-inf")
+        for m in moves:
+            value = max(value, self.min_value(game.forecast_move(m), depth - 1, alpha, beta))
+            if value >= beta:
+                return value
+            alpha = max(alpha, value)
+        return value
+
+    def min_value(self, game, depth, alpha=float("-inf"), beta=float("inf")):
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+        # 1) Return the value of the state if it is terminal or depth limit was reached
+        moves = game.get_legal_moves()
+        if depth == 0 or not moves:
+            return self.score(game, self)
+        # 2) Pick best of all legal moves available
+        value = float("inf")
+        for m in moves:
+            value = min(value, self.max_value(game.forecast_move(m), depth - 1, alpha, beta))
+            if value <= alpha:
+                return value
+            beta = min(beta, value)
+        return value
