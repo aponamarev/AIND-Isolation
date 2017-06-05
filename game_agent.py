@@ -2,7 +2,7 @@
 test your agent's strength against a set of known agents using tournament.py
 and include the results in your report.
 """
-import random
+from sample_players import improved_score, center_score
 
 
 class SearchTimeout(Exception):
@@ -11,10 +11,9 @@ class SearchTimeout(Exception):
 
 
 def custom_score(game, player):
-    """Calculate the heuristic value of a game state from the point of view
-    of the given player.
-
-    This should be the best heuristic function for your project submission.
+    """CenterToDelta Score - a mix of center and improved (delta) score with weight exponentially
+    annealing towards improved score. CenterToDelta score aims to push a player to center of the
+    board in the beginning of the game, and later measure the difference in remaining legal steps.
 
     Note: this function should be called from within a Player instance as
     `self.score()` -- you should not need to call this function directly.
@@ -41,7 +40,15 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    return 0.
+    # Evaluate both center and delta scores
+    center = -center_score(game, player) # take negative of center score to keep player in the middle
+    delta = improved_score(game, player)
+    # Calculate weight annealing
+    w = 0.5**game.move_count
+
+    mixed = w*center + (1-w)*delta
+
+    return mixed
 
 
 def custom_score_2(game, player):
