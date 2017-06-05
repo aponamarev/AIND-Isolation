@@ -2,21 +2,16 @@
 test your agent's strength against a set of known agents using tournament.py
 and include the results in your report.
 """
-from sample_players import improved_score, center_score
 
 
 class SearchTimeout(Exception):
     """Subclass base exception for code clarity. """
     pass
 
-
-def custom_score(game, player):
-    """CenterToDelta Score - a mix of center and improved (delta) score with weight exponentially
-    annealing towards improved score. CenterToDelta score aims to push a player to center of the
-    board in the beginning of the game, and later measure the difference in remaining legal steps.
-
-    Note: this function should be called from within a Player instance as
-    `self.score()` -- you should not need to call this function directly.
+def delta_score(game, player):
+    """The delta_score evaluation function discussed in lecture that outputs a
+    score equal to the difference in the number of moves available to the
+    two players.
 
     Parameters
     ----------
@@ -24,39 +19,30 @@ def custom_score(game, player):
         An instance of `isolation.Board` encoding the current state of the
         game (e.g., player locations and blocked cells).
 
-    player : object
-        A player instance in the current game (i.e., an object corresponding to
-        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+    player : hashable
+        One of the objects registered by the game object as a valid player.
+        (i.e., `player` should be either game.__player_1__ or
+        game.__player_2__).
 
     Returns
-    -------
+    ----------
     float
-        The heuristic value of the current game state to the specified player.
+        The heuristic value of the current game state
     """
-    # TODO: finish this function!
     if game.is_loser(player):
         return float("-inf")
 
     if game.is_winner(player):
         return float("inf")
 
-    # Evaluate both center and delta scores
-    center = -center_score(game, player) # take negative of center score to keep player in the middle
-    delta = improved_score(game, player)
-    # Calculate weight annealing
-    w = 0.5**game.move_count
-
-    mixed = w*center + (1-w)*delta
-
-    return mixed
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+    return float(own_moves - opp_moves)
 
 
-def custom_score_2(game, player):
-    """Calculate the heuristic value of a game state from the point of view
-    of the given player.
-
-    Note: this function should be called from within a Player instance as
-    `self.score()` -- you should not need to call this function directly.
+def center_score(game, player):
+    """Outputs a score equal to square of the distance from the center of the
+    board to the position of the player.
 
     Parameters
     ----------
@@ -64,48 +50,16 @@ def custom_score_2(game, player):
         An instance of `isolation.Board` encoding the current state of the
         game (e.g., player locations and blocked cells).
 
-    player : object
-        A player instance in the current game (i.e., an object corresponding to
-        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+    player : hashable
+        One of the objects registered by the game object as a valid player.
+        (i.e., `player` should be either game.__player_1__ or
+        game.__player_2__).
 
     Returns
-    -------
-    float
-        The heuristic value of the current game state to the specified player.
-    """
-    # TODO: finish this function!
-    if game.is_loser(player):
-        return float("-inf")
-
-    if game.is_winner(player):
-        return float("inf")
-
-    return float(len(game.get_legal_moves(player)))
-
-
-def custom_score_3(game, player):
-    """Calculate the heuristic value of a game state from the point of view
-    of the given player.
-
-    Note: this function should be called from within a Player instance as
-    `self.score()` -- you should not need to call this function directly.
-
-    Parameters
     ----------
-    game : `isolation.Board`
-        An instance of `isolation.Board` encoding the current state of the
-        game (e.g., player locations and blocked cells).
-
-    player : object
-        A player instance in the current game (i.e., an object corresponding to
-        one of the player objects `game.__player_1__` or `game.__player_2__`.)
-
-    Returns
-    -------
     float
-        The heuristic value of the current game state to the specified player.
+        The heuristic value of the current game state
     """
-    # TODO: finish this function!
     if game.is_loser(player):
         return float("-inf")
 
@@ -115,6 +69,122 @@ def custom_score_3(game, player):
     w, h = game.width / 2., game.height / 2.
     y, x = game.get_player_location(player)
     return float((h - y)**2 + (w - x)**2)
+
+
+def custom_score(game, player):
+    """CenterToDelta Score - penalizes player for deviating from the own_center of the board and rewards for
+    advantage in available steps. This score is a mix of own_center and improved (delta) scores with weight exponentially
+    annealing towards improved score.
+
+    Note: this function should be called from within a Player instance as
+    `self.score()` -- you should not need to call this function directly.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    -------
+    float
+        The heuristic value of the current game state to the specified player.
+    """
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    # Evaluate both own_center and delta scores
+    own_center = -center_score(game, player)**0.5 # take negative of own_center score to accrue penalty
+    delta = delta_score(game, player)
+    # Calculate weight annealing
+    w = 0.5 ** game.move_count
+
+    mixed_score = w*own_center + (1-w)*delta
+
+    return mixed_score
+
+
+def custom_score_2(game, player):
+    """AggressiveCenterToDelta Score - rewards a player for pushing opponent away from the opp_center of the board and for
+    advantage in available steps. This score is a mix of opponent opp_center score and improved (delta) score with weight
+    exponentially annealing towards improved score.
+
+    Note: this function should be called from within a Player instance as
+    `self.score()` -- you should not need to call this function directly.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    -------
+    float
+        The heuristic value of the current game state to the specified player.
+    """
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    # Evaluate both opp_center and delta scores
+    opp_center = center_score(game, game.get_opponent(player))**0.5
+    delta = delta_score(game, player)
+    # Calculate weight annealing
+    w = 0.5 ** game.move_count
+
+    mixed_score = w * opp_center + (1 - w) * delta
+
+    return mixed_score
+
+
+def custom_score_3(game, player):
+    """Combines rewards for pushing opponent away from the center and punishes player for
+     deviating from the center of the board. In addition rewards a player for advantage in available steps.
+     This score is a mix of opponent and player center scores and improved (delta) score with weight
+    exponentially annealing towards improved score.
+
+    Note: this function should be called from within a Player instance as
+    `self.score()` -- you should not need to call this function directly.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    -------
+    float
+        The heuristic value of the current game state to the specified player.
+    """
+    # Evaluate both center and delta scores
+    opp_center = center_score(game, game.get_opponent(player)) ** 0.5
+    own_center = center_score(game, player) ** 0.5
+    delta = delta_score(game, player)
+    # Calculate weight annealing
+    w = 0.5 ** game.move_count
+
+    mixed_score = w * (opp_center-own_center) + (1 - w) * delta
+
+    return mixed_score
 
 
 class IsolationPlayer:
